@@ -1,6 +1,5 @@
-// Jenkinsfile (Declarative Pipeline) — Multibranch friendly
 pipeline {
-  agent any//{ label 'docker' } // or use 'k8s' label for k8s agent; provide appropriate agent template
+  agent any // top-level agent so post steps can run in node when available
   environment {
     // set defaults; override in Jenkins credentials bindings or pipeline params
     APP_NAME = "sample-app"
@@ -8,13 +7,12 @@ pipeline {
     // Choose registry: dockerhub, ghcr, or ECR
     REGISTRY = "dockerhub" // options: dockerhub | ghcr | ecr
     DOCKERHUB_CRED = "dockerhub-creds"
-    GHCR_TOKEN = credentials('ghcr-token') // secret text
+    GHCR_TOKEN = credentials('github-token') // secret text - ensure this exists
     AWS_CREDS = 'aws-creds'
     KUBECONFIG_CREDENTIAL_ID = 'kubeconfig-dev'
     SONAR_TOKEN = credentials('sonar-token')
-    // build tag using commit sha
-    GIT_SHORT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-    IMAGE_TAG = "${GIT_SHORT}"
+    // NOTE: compute GIT_SHORT and IMAGE_TAG after checkout (below)
+    GITHUB_USER = "bitteswar" // set your GitHub username here or via credentials/params
   }
 
   options {
@@ -29,13 +27,19 @@ pipeline {
     stage('Checkout') {
       steps {
         checkout scm
+        // compute git short after we have a workspace / node
+        script {
+          def g = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          env.GIT_SHORT = g
+          env.IMAGE_TAG = "${g}"
+        }
         sh 'git rev-parse --abbrev-ref HEAD > .branch || true'
-        echo "Building branch: ${env.BRANCH_NAME}"
+        echo "Building branch: ${env.BRANCH_NAME}  (sha: ${env.IMAGE_TAG})"
       }
     }
 
     stage('Unit Tests & Build JAR') {
-      agent { label 'maven' } // optional: run on a Maven-enabled agent
+      agent { label 'maven' } // ensure you have a node labelled 'maven'
       steps {
         sh 'mvn -B -DskipTests=false clean package'
         junit '**/target/surefire-reports/*.xml'
@@ -47,7 +51,6 @@ pipeline {
       when { expression { return fileExists('pom.xml') } }
       steps {
         withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-          // Adjust sonar scanner command as per your SonarQube setup
           sh '''
             mvn -B sonar:sonar \
               -Dsonar.projectKey=sample-app \
@@ -59,18 +62,14 @@ pipeline {
     }
 
     stage('Build Docker Image') {
-      agent { label 'docker' } // agent where docker/Buildx available
+      agent { label 'docker' } // node must have docker
       steps {
-        // Unstash JAR if you built separately
-        unstash 'app-jar' // if produced earlier
+        unstash 'app-jar'
         sh 'export DOCKER_BUILDKIT=1 || true'
         script {
-          // Use Buildx for multi-arch optionally
           def imageName = "${REPO}:${IMAGE_TAG}"
           sh "docker build -f Dockerfile.local -t ${imageName} ."
-          // tag latest too
           sh "docker tag ${imageName} ${REPO}:latest"
-          // save image-info
           sh "echo ${imageName} > image-info.txt"
           archiveArtifacts artifacts: 'image-info.txt', fingerprint: true
         }
@@ -82,11 +81,9 @@ pipeline {
       steps {
         script {
           def imageName = "${REPO}:${IMAGE_TAG}"
-          // Trivy security scan (allow non-zero exit but mark in junit/console)
           sh '''
             trivy image --severity HIGH,CRITICAL --no-progress --format table ${IMAGE} || true
           '''.replace('${IMAGE}', imageName)
-          // Generate SBOM with syft
           sh "syft ${imageName} -o json > sbom-${IMAGE_TAG}.json"
           archiveArtifacts artifacts: "sbom-${IMAGE_TAG}.json, trivy-*.json", fingerprint: true
         }
@@ -108,7 +105,6 @@ pipeline {
             sh "docker tag ${REPO}:${IMAGE_TAG} ghcr.io/${GITHUB_USER}/${APP_NAME}:${IMAGE_TAG}"
             sh "docker push ghcr.io/${GITHUB_USER}/${APP_NAME}:${IMAGE_TAG}"
           } else if (env.REGISTRY == 'ecr') {
-            // Using AWS credentials binding
             withAWS(credentials: env.AWS_CREDS, region: 'ap-south-1') {
               sh '''
                 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -127,7 +123,7 @@ pipeline {
     }
 
     stage('Deploy to Dev (Helm)') {
-      agent { label 'kubectl' } // agent where kubectl + helm are available
+      agent { label 'kubectl' } // ensure a node has kubectl+helm and label 'kubectl' is present
       steps {
         withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
           sh '''
@@ -156,7 +152,6 @@ pipeline {
         submitter "admin"
       }
       steps {
-        // promote to staging using helm (same as deploy)
         withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
           sh '''
             export KUBECONFIG=${KUBECONFIG}
@@ -174,14 +169,19 @@ pipeline {
   post {
     success {
       echo "Build and deploy succeeded: ${env.BUILD_URL}"
-      // notify or Slack integration here
     }
     failure {
       echo "Pipeline failed: ${env.BUILD_URL}"
-      // email or Slack notifications
     }
     always {
-      cleanWs()
+      script {
+        if (env.WORKSPACE) {
+          echo "Cleaning workspace at ${env.WORKSPACE}"
+          deleteDir()
+        } else {
+          echo "No workspace available to clean - skipping"
+        }
+      }
     }
   }
 }
