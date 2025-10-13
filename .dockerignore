@@ -1,0 +1,15 @@
+# .dockerignore
+target
+**/target
+*.log
+.DS_Store
+.vscode
+.idea
+*.iml
+.git
+.gitignore
+README.md
+*.md
+.mvn/wrapper/maven-wrapper.jar
+docker-compose.yml
+Dockerfile.*  # ignore other Dockerfile variants in context

@@ -1,0 +1,48 @@
+# Dockerfile.git
+# Builds by cloning the GitHub repository during the image build
+# Usage:
+# docker build --build-arg GIT_REPO="https://github.com/bitteswar/MultiCI-CD-Realtime.git" \
+#              --build-arg GIT_REF="main" -f Dockerfile.git -t sample-app:github .
+
+# Stage: builder with git + maven
+FROM maven:3.9.4-eclipse-temurin-17 AS builder
+ARG GIT_REPO="https://github.com/bitteswar/MultiCI-CD-Realtime.git"
+ARG GIT_REF="main"
+WORKDIR /workspace
+
+USER root
+# install git (maven image is Debian-based)
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# clone specified ref shallowly for speed
+RUN git clone --depth 1 --branch "${GIT_REF}" "${GIT_REPO}" repo
+
+WORKDIR /workspace/repo
+
+# prefetch dependencies and build
+RUN mvn -B -DskipTests dependency:go-offline
+RUN mvn -B -DskipTests package
+
+# Stage: runtime
+FROM eclipse-temurin:17-jre
+ARG APP_JAR=target/*.jar
+WORKDIR /app
+
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
+COPY --from=builder /workspace/repo/${APP_JAR} /app/app.jar
+
+ENV JAVA_OPTS="-Xms256m -Xmx512m -Djava.security.egd=file:/dev/./urandom"
+
+LABEL org.opencontainers.image.title="sample-app" \
+      org.opencontainers.image.description="Sample Spring Boot app (built from GitHub during docker build)" \
+      org.opencontainers.image.version="0.0.1"
+
+USER appuser
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]
