@@ -1,6 +1,6 @@
 // Jenkinsfile (Declarative Pipeline) — Multibranch friendly
 pipeline {
-  agent { label 'docker' } // or use 'k8s' label for k8s agent; provide appropriate agent template
+  agent any//{ label 'docker' } // or use 'k8s' label for k8s agent; provide appropriate agent template
   environment {
     // set defaults; override in Jenkins credentials bindings or pipeline params
     APP_NAME = "sample-app"
