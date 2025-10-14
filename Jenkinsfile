@@ -78,7 +78,7 @@ pipeline {
     }
 
     stage('Image Scan & SBOM') {
-      agent { label 'docker' }
+      agent any//{ label 'docker' }
       steps {
         script {
           def imageName = "${REPO}:${IMAGE_TAG}"
