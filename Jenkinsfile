@@ -54,7 +54,7 @@ pipeline {
           sh '''
             mvn -B sonar:sonar \
               -Dsonar.projectKey=multici-cd-realtime \
-              -Dsonar.organization=MultiCI-CD-Realtime \
+              -Dsonar.organization=multici-cd-realtime \
               -Dsonar.host.url=${SONAR_HOST_URL} \
               -Dsonar.login=${SONAR_TOKEN}
           '''
