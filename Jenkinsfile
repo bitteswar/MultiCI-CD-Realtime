@@ -39,7 +39,7 @@ pipeline {
     }
 
     stage('Unit Tests & Build JAR') {
-      // agent { label 'maven' } // ensure you have a node labelled 'maven'
+      //  agent { label 'maven' } // ensure you have a node labelled 'maven'
       steps {
         sh 'mvn -B -DskipTests=false clean package'
         junit '**/target/surefire-reports/*.xml'
@@ -53,7 +53,8 @@ pipeline {
         withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
           sh '''
             mvn -B sonar:sonar \
-              -Dsonar.projectKey=sample-app \
+              -Dsonar.projectKey=multici-cd-realtime \
+              -Dsonar.organization=MultiCI-CD-Realtime \
               -Dsonar.host.url=${SONAR_HOST_URL} \
               -Dsonar.login=${SONAR_TOKEN}
           '''
