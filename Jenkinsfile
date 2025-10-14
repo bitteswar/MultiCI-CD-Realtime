@@ -63,7 +63,7 @@ pipeline {
     }
 
     stage('Build Docker Image') {
-      agent { label 'docker' } // node must have docker
+      agent any//{ label 'docker' } // node must have docker
       steps {
         unstash 'app-jar'
         sh 'export DOCKER_BUILDKIT=1 || true'
