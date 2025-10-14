@@ -78,7 +78,7 @@ pipeline {
     }
 
     stage('Image Scan & SBOM') {
-      agent any//{ label 'docker' }
+      agent any //{ label 'docker' }
       steps {
         script {
           def imageName = "${REPO}:${IMAGE_TAG}"
@@ -92,7 +92,7 @@ pipeline {
     }
 
     stage('Push Image to Registry') {
-      agent { label 'docker' }
+      agent any //{ label 'docker' }
       steps {
         script {
           if (env.REGISTRY == 'dockerhub') {
