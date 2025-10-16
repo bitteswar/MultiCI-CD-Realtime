@@ -131,7 +131,7 @@ pipeline {
     }
 
     stage('Deploy to Dev (Helm)') {
-      agent { label 'kubectl' } // ensure a node has kubectl+helm and label 'kubectl' is present
+      agent any//{ label 'kubectl' } // ensure a node has kubectl+helm and label 'kubectl' is present
       steps {
         withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
           sh '''
@@ -147,7 +147,7 @@ pipeline {
     }
 
     stage('Smoke Tests') {
-      agent { label 'docker' }
+      agent any //{ label 'docker' }
       steps {
         sh './scripts/smoke-test.sh http://localhost:8080/api/hello || exit 1'
       }
