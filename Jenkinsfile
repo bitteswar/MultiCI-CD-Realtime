@@ -85,7 +85,14 @@ pipeline {
           sh '''
             trivy image --severity HIGH,CRITICAL --no-progress --format table ${IMAGE} || true
           '''.replace('${IMAGE}', imageName)
-          sh "syft ${imageName} -o json > sbom-${IMAGE_TAG}.json"
+             // Use official Syft container to generate SBOM (writes to workspace)
+          sh """
+            docker run --rm \\
+            -v /var/run/docker.sock:/var/run/docker.sock \\
+            -v $WORKSPACE:$WORKSPACE \\
+            -w $WORKSPACE \\
+             anchore/syft:latest ${imageName} -o json > sbom-${IMAGE_TAG}.json
+            """
           archiveArtifacts artifacts: "sbom-${IMAGE_TAG}.json, trivy-*.json", fingerprint: true
         }
       }
