@@ -134,13 +134,16 @@ pipeline {
   agent {
     docker {
       image 'lachlanevenson/k8s-helm:latest' // contains helm and kubectl
-      args '-v /var/run/docker.sock:/var/run/docker.sock' // optional
+            // force a POSIX shell as entrypoint and mount docker socket
+      args '--entrypoint=/bin/sh -v /var/run/docker.sock:/var/run/docker.sock'
     }
   }
   // { label 'kubectl' } // ensure a node has kubectl+helm and label 'kubectl' is present
   steps {
     withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
       sh '''
+        helm version
+        kubectl version --client
         export KUBECONFIG=${KUBECONFIG}
         helm upgrade --install ${APP_NAME} ./helm/sample-app \
           --namespace dev --create-namespace \
