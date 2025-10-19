@@ -133,7 +133,7 @@ pipeline {
     stage('Deploy to Dev (Helm)') {
   agent {
     docker {
-      image 'lachlanevenson/k8s-helm:3.9.0' // contains helm and kubectl
+      image 'lachlanevenson/k8s-helm:latest' // contains helm and kubectl
       args '-v /var/run/docker.sock:/var/run/docker.sock' // optional
     }
   }
