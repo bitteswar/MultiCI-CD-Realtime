@@ -1,0 +1,117 @@
+# combined.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-deployer
+  namespace: dev
+---
+# Namespace-scoped Role: CI deployer (typical permissions for CI)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-deployer-role
+  namespace: dev
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "services", "endpoints", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+# RoleBinding that connects SA -> Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-deployer-rolebinding
+  namespace: dev
+subjects:
+- kind: ServiceAccount
+  name: jenkins-deployer
+  namespace: dev
+roleRef:
+  kind: Role
+  name: jenkins-deployer-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Small namespace-scoped "inspect" Role so the SA can list RBAC objects in dev (optional, recommended)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-deployer-inspect
+  namespace: dev
+rules:
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-deployer-inspect-binding
+  namespace: dev
+subjects:
+- kind: ServiceAccount
+  name: jenkins-deployer
+  namespace: dev
+roleRef:
+  kind: Role
+  name: jenkins-deployer-inspect
+  apiGroup: rbac.authorization.k8s.io
+---
+# Optional minimal ClusterRole that allows listing namespaces (if you need cluster-level namespace listing)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jenkins-ns-list-only
+rules:
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get","list","watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: jenkins-ns-list-binding
+subjects:
+- kind: ServiceAccount
+  name: jenkins-deployer
+  namespace: dev
+roleRef:
+  kind: ClusterRole
+  name: jenkins-ns-list-only
+  apiGroup: rbac.authorization.k8s.io
+---
+# Sample deployment to validate permissions (nginx)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-nginx
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-nginx
+  template:
+    metadata:
+      labels:
+        app: hello-nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:stable
+        ports:
+        - containerPort: 80

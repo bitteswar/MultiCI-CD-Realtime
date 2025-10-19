@@ -131,7 +131,13 @@ pipeline {
     }
 
     stage('Deploy to Dev (Helm)') {
-      agent any//{ label 'kubectl' } // ensure a node has kubectl+helm and label 'kubectl' is present
+      agent {
+    docker {
+      image 'lachlanevenson/k8s-helm:3.9.0' // contains helm and kubectl
+      args '-v /var/run/docker.sock:/var/run/docker.sock' // optional
+    }
+    } 
+    }//{ label 'kubectl' } // ensure a node has kubectl+helm and label 'kubectl' is present
       steps {
         withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
           sh '''
