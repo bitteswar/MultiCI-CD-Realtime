@@ -133,15 +133,17 @@ pipeline {
     stage('Deploy to Dev (Helm)') {
   agent {
     docker {
-      image 'lachlanevenson/k8s-helm:latest' // contains helm and kubectl
+      image 'dtzar/helm-kubectl:3.9.3' // contains helm and kubectl
             // force a POSIX shell as entrypoint and mount docker socket
-      args '--entrypoint=/bin/sh -v /var/run/docker.sock:/var/run/docker.sock'
+      args '-v /var/run/docker.sock:/var/run/docker.sock'
     }
   }
   // { label 'kubectl' } // ensure a node has kubectl+helm and label 'kubectl' is present
   steps {
     withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
       sh '''
+        ls -la
+        ls -la helm || true
         helm version
         kubectl version --client
         export KUBECONFIG=${KUBECONFIG}
