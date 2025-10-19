@@ -131,26 +131,27 @@ pipeline {
     }
 
     stage('Deploy to Dev (Helm)') {
-      agent {
+  agent {
     docker {
       image 'lachlanevenson/k8s-helm:3.9.0' // contains helm and kubectl
       args '-v /var/run/docker.sock:/var/run/docker.sock' // optional
     }
-    } 
-    }//{ label 'kubectl' } // ensure a node has kubectl+helm and label 'kubectl' is present
-      steps {
-        withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
-          sh '''
-            export KUBECONFIG=${KUBECONFIG}
-            helm upgrade --install ${APP_NAME} ./helm/sample-app \
-              --namespace dev --create-namespace \
-              --set image.repository=${REPO} \
-              --set image.tag=${IMAGE_TAG} \
-              --wait --timeout 120s
-          '''
-        }
-      }
+  }
+  // { label 'kubectl' } // ensure a node has kubectl+helm and label 'kubectl' is present
+  steps {
+    withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
+      sh '''
+        export KUBECONFIG=${KUBECONFIG}
+        helm upgrade --install ${APP_NAME} ./helm/sample-app \
+          --namespace dev --create-namespace \
+          --set image.repository=${REPO} \
+          --set image.tag=${IMAGE_TAG} \
+          --wait --timeout 120s
+      '''
     }
+  }
+}
+
 
     stage('Smoke Tests') {
       agent any //{ label 'docker' }
