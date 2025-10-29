@@ -1,0 +1,9 @@
+Thank you for installing {{ .Chart.Name }}.
+
+The service is available at:
+  - Service: {{ include "sample-app.fullname" . }}-svc :{{ .Values.service.port }}
+
+If Ingress is enabled, check host(s):
+{{- range .Values.ingress.hosts }}
+  - {{ .host }}
+{{- end }}

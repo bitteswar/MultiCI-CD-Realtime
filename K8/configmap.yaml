@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: configmap
+metadata: 
+  name: sample-app-config
+  labels:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: sample-app-instance
+data:
+  application.properties: | 
+    spring.profiles.active=dev
+    custom.value=hello

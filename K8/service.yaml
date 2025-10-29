@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-app-service
+  labels:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: sample-app-instance
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: sample-app-instance

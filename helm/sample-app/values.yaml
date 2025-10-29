@@ -1,0 +1,65 @@
+replicas: 2
+image:
+  repository: bitteswar/sample-app
+  tag: latest
+  pullPolicy: IfNotPresent
+serviceAccount:
+  create: true
+  name: sample-app-sa
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  name: http
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+  # other annotations, e.g. cert-manager:
+  # cert-manager.io/cluster-issuer: "letsencrypt"
+
+  # OR you can set a simple ingress.class (fallback)
+  # class: nginx
+
+  # Preferred: list of hosts with paths (flexible)
+  hosts: 
+    - host: sample-app.local
+      paths:
+        - path: /
+          pathType: Prefix
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+livenessProbe:
+  httpGet:
+    path: /actuator/health
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+readinessProbe:
+  httpGet:
+    path: /actuator/health
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+config:
+  spring_profiles_active: "dev"
+  custom_value: "hello"
+secret:
+  DB_PASSWORD: "changeme"
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get", "list", "watch"]
+pod: 
+  - name: sample-app
+    env: []
+    extraVolumeMounts: []
+    volumes: []
+    extraEnvs: []
+    

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: deployment
+metadata:
+  name: sample-app-deployment
+  labels:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: sample-app-instance
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.Kubernetes.io/name: sample-app
+      app.Kubernetes.io/instance: sample-app-instance
+  template:
+    metadata:
+      labels:
+        app.Kubernetes.io/name: sample-app
+        app.Kubernetes.io/instance: sample-app-instance
+    spec:
+      serviceAccountName: sample-app-sa
+      containers:
+        - name: sample-app
+          image: bitteswar/sample-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe: 
+            httpGet: 
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          env: []
+          extraVolumeMounts: []
+      volumes: []

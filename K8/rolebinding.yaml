@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Rolebinding
+metadata:
+  name: sample-app-rolebinding
+  labels:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: sample-app-instance
+subjects:
+  - kind: ServiceAccount
+    name: sample-app-sa
+    namespace: default 
+
+roleRef:
+  kind: Role
+  name: sample-app-role
+  apiGroup: rbac.authorization.k8s.io

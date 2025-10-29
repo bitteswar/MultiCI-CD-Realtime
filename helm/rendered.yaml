@@ -1,0 +1,153 @@
+---
+# Source: sample-app/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sample-app-sa
+  labels:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
+---
+# Source: sample-app/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: release-name-sample-app-secret
+  labels:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
+type: Opaque
+stringData:
+    DB_PASSWORD: "changeme"
+---
+# Source: sample-app/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-name-sample-app-svc
+  labels:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: 
+      name: http
+  selector:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
+---
+# Source: sample-app/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-sample-app-deployment
+  labels:
+    app.kubernetes.io/name: sample-app
+    app.kubernetes.io/instance: release-name
+spec:
+  replicas: 
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sample-app
+      app.kubernetes.io/instance: release-name
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sample-app
+        app.kubernetes.io/instance: release-name
+    spec:
+      serviceAccountName: sample-app-sa
+      containers:
+        - name: release-name-sample-app
+          image: "bitteswar/sample-app:latest"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path:   
+              port: 
+            initialDelaySeconds: 
+            periodSeconds: 
+            timeoutSeconds: 
+          readinessProbe: 
+            httpGet: 
+              path: 
+              port: 
+            initialDelaySeconds:  
+            periodSeconds: 
+            timeoutSeconds:
+---
+# Source: sample-app/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: release-name-sample-app-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+  labels:
+    app.Kubernetes.io/name: sample-app  
+    app.Kubernetes.io/instance: release-name
+spec:
+  rules:
+    - host: sample-app.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: release-name-sample-app-svc
+                port:
+                  number: 8080
+---
+# Source: sample-app/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Rolebinding
+metadata:
+  name: release-name-sample-app-rolebinding
+  labels:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
+subjects:
+  - kind: ServiceAccount
+    name: sample-app-sa
+
+roleRef:
+  kind: Role
+  name: release-name-sample-app-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: sample-app/templates/configmap.yaml
+apiVersion: v1
+kind: configmap
+metadata: 
+  name: release-name-sample-app-config
+  labels:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
+data:
+  application.properties: | 
+    spring.profiles.active=
+    custom.value=
+---
+# Source: sample-app/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: role
+metadata: 
+  name: release-name-sample-app-role
+  labels:
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
+rules:
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
