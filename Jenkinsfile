@@ -161,6 +161,7 @@ pipeline {
     stage('Smoke Tests') {
       agent any //{ label 'docker' }
       steps {
+        sh 'chmod +x ./scripts/smoke-test.sh'
         sh './scripts/smoke-test.sh http://localhost:8080/api/hello || exit 1'
       }
     }
