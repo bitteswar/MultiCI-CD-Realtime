@@ -12,3 +12,7 @@
 {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 {{- end -}}
+{{- /* Return the ServiceAccount name: prefer .Values.serviceAccount.name, else fall back to "<release>-<chart>" */ -}}
+{{- define "sample-app.serviceAccountName" -}}
+{{- default (printf "%s-%s" .Release.Name .Chart.Name) .Values.serviceAccount.name -}}
+{{- end -}}
