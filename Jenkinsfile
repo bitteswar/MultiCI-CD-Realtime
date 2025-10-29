@@ -162,18 +162,16 @@ pipeline {
   agent any
   steps {
     sh '''
-      set -euo pipefail
-      echo "=== Smoke tests: ensure script executable ==="
+      echo "Ensuring script exists and is executable"
       test -f ./scripts/smoke-test.sh
       chmod +x ./scripts/smoke-test.sh
 
-      echo "=== Show what is listening on :8080 (if ss/netstat present) ==="
+      echo "Show listener on :8080 if available"
       if command -v ss >/dev/null 2>&1; then ss -ltnp | grep ':8080' || true; fi
       if command -v netstat >/dev/null 2>&1; then netstat -tlnp | grep ':8080' || true; fi
 
-      echo "=== Run smoke-test ==="
-      # You can override BASE_URL/HEALTH_PATH via env if needed:
-      ./scripts/smoke-test.sh "${PP_URL:-http://localhost:8080}" "${HEALTH:-/actuator/health}" "${API_PATH:-/api/hello}"
+      echo "Running smoke-test with bash..."
+      bash -lc './scripts/smoke-test.sh "${PP_URL:-http://localhost:8080}" "${HEALTH:-/actuator/health}" "${API_PATH:-/api/hello}"'
     '''
   }
 }
