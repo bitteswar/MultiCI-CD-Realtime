@@ -1,5 +1,5 @@
 apiVersion: v1
-kind: ConfigMap
+kind: configmap
 metadata: 
   name: {{ include "sample-app.fullname" . }}-config
   labels:

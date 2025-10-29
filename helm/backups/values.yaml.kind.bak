@@ -1,23 +1,16 @@
-replicaCount: 2
+replicas: 2
 image:
   repository: bitteswar/sample-app
   tag: latest
   pullPolicy: IfNotPresent
-
-# Container port used by Deployment (probes fall back to this)
-containerPort: 8080
-
 serviceAccount:
   create: true
   name: sample-app-sa
-
 service:
   type: ClusterIP
   port: 8080
   targetPort: 8080
-  protocol: TCP
   name: http
-
 ingress:
   enabled: true
   annotations:
@@ -34,28 +27,29 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-
-liveness:
-    path: /actuator/health
-    port: 8080
-    initialDelaySeconds: 60
-    periodSeconds: 10
-    timeoutSeconds: 5
-
-readiness:
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+livenessProbe:
+  httpGet:
     path: /actuator/health
     port: 8080
     initialDelaySeconds: 30
     periodSeconds: 10
     timeoutSeconds: 5
-
+readinessProbe:
+  httpGet:
+    path: /actuator/health
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
 config:
   spring_profiles_active: "dev"
   custom_value: "hello"
-
 secret:
   DB_PASSWORD: "changeme"
-
 rbac:
   create: true
   rules:
@@ -64,15 +58,8 @@ rbac:
       verbs: ["get", "list", "watch"]
 pod: 
   - name: sample-app
-
-# Optional env/volumes used by templates:
-env: []               # example: - name: FOO; value: "bar"
-extraVolumeMounts: [] # example: - name: data; mountPath: /data
-volumes: []           # example: - name: data; emptyDir: {}
-extraEnvs: []         # alternate name if templates reference it
-
-# Resources / node selectors / affinity (kept default)
-resources: {}
-nodeSelector: {}
-tolerations: []
-affinity: {}
+    env: []
+    extraVolumeMounts: []
+    volumes: []
+    extraEnvs: []
+    

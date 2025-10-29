@@ -1,10 +1,10 @@
 apiVersion: v1
-kind: ConfigMap
+kind: configmap
 metadata: 
   name: {{ include "sample-app.fullname" . }}-config
   labels:
-    app.kubernetes.io/name: sample-app
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: {{ .Release.Name }}
 data:
   application.properties: | 
     spring.profiles.active={{ .Values.config.springProfileActive}}

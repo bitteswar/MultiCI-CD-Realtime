@@ -1,0 +1,17 @@
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "sample-app.fullname" . }}-rolebinding
+  labels:
+    app.kubernetes.io/name: sample-app
+    app.kubernetes.io/instance: {{ .Release.Name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccount.name | default (printf "%s-sa" (include "sample-app.fullname" .)) }}
+
+roleRef:
+  kind: Role
+  name: {{ include "sample-app.fullname" . }}-role
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

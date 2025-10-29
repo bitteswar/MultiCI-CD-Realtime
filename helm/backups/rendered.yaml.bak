@@ -5,8 +5,8 @@ kind: ServiceAccount
 metadata:
   name: sample-app-sa
   labels:
-    app.kubernetes.io/name: sample-app
-    app.kubernetes.io/instance: release-name
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
 ---
 # Source: sample-app/templates/secret.yaml
 apiVersion: v1
@@ -14,8 +14,8 @@ kind: Secret
 metadata:
   name: release-name-sample-app-secret
   labels:
-    app.kubernetes.io/name: sample-app
-    app.kubernetes.io/instance: release-name
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
 type: Opaque
 stringData:
     DB_PASSWORD: "changeme"
@@ -26,8 +26,8 @@ kind: Service
 metadata:
   name: release-name-sample-app-svc
   labels:
-    app.kubernetes.io/name: sample-app
-    app.kubernetes.io/instance: release-name
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
 spec:
   type: ClusterIP
   ports:
@@ -36,8 +36,8 @@ spec:
       protocol: 
       name: http
   selector:
-    app.kubernetes.io/name: sample-app
-    app.kubernetes.io/instance: release-name
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
 ---
 # Source: sample-app/templates/deployment.yaml
 apiVersion: apps/v1
@@ -89,8 +89,8 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
   labels:
-    app.kubernetes.io/name: sample-app  
-    app.kubernetes.io/instance: release-name
+    app.Kubernetes.io/name: sample-app  
+    app.Kubernetes.io/instance: release-name
 spec:
   rules:
     - host: sample-app.local
@@ -110,8 +110,8 @@ kind: RoleBinding
 metadata:
   name: release-name-sample-app-rolebinding
   labels:
-    app.kubernetes.io/name: sample-app
-    app.kubernetes.io/instance: release-name
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
 subjects:
   - kind: ServiceAccount
     name: sample-app-sa
@@ -123,12 +123,12 @@ roleRef:
 ---
 # Source: sample-app/templates/configmap.yaml
 apiVersion: v1
-kind: ConfigMap
+kind: configmap
 metadata: 
   name: release-name-sample-app-config
   labels:
-    app.kubernetes.io/name: sample-app
-    app.kubernetes.io/instance: release-name
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
 data:
   application.properties: | 
     spring.profiles.active=
@@ -136,12 +136,12 @@ data:
 ---
 # Source: sample-app/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: role
 metadata: 
   name: release-name-sample-app-role
   labels:
-    app.kubernetes.io/name: sample-app
-    app.kubernetes.io/instance: release-name
+    app.Kubernetes.io/name: sample-app
+    app.Kubernetes.io/instance: release-name
 rules:
   - apiGroups:
     - ""
