@@ -156,9 +156,7 @@ pipeline {
     }
   }
 }
-
-
-  stage('Smoke test') {
+stage('Smoke test') {
   agent {
     docker {
       image 'dtzar/helm-kubectl:3.9.3'
@@ -168,31 +166,33 @@ pipeline {
   steps {
     withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
       sh '''
-#!/usr/bin/env bash
-set -euo pipefail
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cp "$KUBECONFIG_FILE" ./kubeconfig
+    export KUBECONFIG=$(pwd)/kubeconfig
+    chmod +x ./scripts/portforward-smoke.sh || true
+    chmod +x ./scripts/smoke-test.sh || true
+    kubectl -n dev wait --for=condition=ready pod -l app.kubernetes.io/name=sample-app --timeout=120s
 
-# copy kubeconfig to workspace
-cp "$KUBECONFIG_FILE" ./kubeconfig
-export KUBECONFIG=$(pwd)/kubeconfig
+   # optional tuning:
+    export PF_RETRIES=12
+    export PF_DELAY=3
+    export PF_HEALTH_PATH=/actuator/health
 
-# ensure wrapper exists & is executable
-chmod +x ./scripts/portforward-smoke.sh || true
-chmod +x ./scripts/smoke-test.sh || true
-
-# wait for pods to be ready
-kubectl -n dev wait --for=condition=ready pod -l app.kubernetes.io/name=sample-app --timeout=120s
-
-# run smoke test through port-forward
 ./scripts/portforward-smoke.sh svc/sample-app-sample-app-svc 18080 8080 -- bash ./scripts/smoke-test.sh "http://localhost:18080" "/actuator/health" "/api/hello"
 '''
     }
   }
-}
-
-
-
-
-
+  post {
+    failure {
+      sh '''
+        kubectl -n dev get pods -o wide || true
+        kubectl -n dev describe deploy sample-app || true
+        kubectl -n dev logs -l app.kubernetes.io/name=sample-app --tail=200 || true
+      '''
+    }
+  }
+ }
 
     stage('Promote to Staging') {
       when { branch 'main' }
