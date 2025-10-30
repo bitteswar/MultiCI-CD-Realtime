@@ -158,23 +158,25 @@ pipeline {
 }
 
 
-  stage('Smoke Tests') {
-  agent any
+  stage('Smoke test') {
   steps {
-    sh '''
-      echo "Ensuring script exists and is executable"
-      test -f ./scripts/smoke-test.sh
-      chmod +x ./scripts/smoke-test.sh
+    withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
+      sh '''
+        cp "$KUBECONFIG_FILE" ./kubeconfig
+        export KUBECONFIG=$(pwd)/kubeconfig
 
-      echo "Show listener on :8080 if available"
-      if command -v ss >/dev/null 2>&1; then ss -ltnp | grep ':8080' || true; fi
-      if command -v netstat >/dev/null 2>&1; then netstat -tlnp | grep ':8080' || true; fi
+        kubectl -n dev port-forward svc/sample-app-sample-app-svc 18080:8080 > pf.log 2>&1 &
+        PF_PID=$!
+        sleep 3
 
-      echo "Running smoke-test with bash..."
-      bash -lc './scripts/smoke-test.sh "${PP_URL:-http://localhost:8080}" "${HEALTH:-/actuator/health}" "${API_PATH:-/api/hello}"'
-    '''
+        ./scripts/smoke-test.sh "http://localhost:18080" "/actuator/health" "/api/hello"
+
+        kill $PF_PID || true
+      '''
+    }
   }
 }
+
 
     stage('Promote to Staging') {
       when { branch 'main' }
