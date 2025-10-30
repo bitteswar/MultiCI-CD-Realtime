@@ -162,22 +162,22 @@ pipeline {
   steps {
     withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
       sh '''
-#!/usr/bin/env bash
+bash -c "
 set -euo pipefail
 
-# copy kubeconfig to workspace (credential supplied by Jenkins)
-cp "$KUBECONFIG_FILE" ./kubeconfig
+# copy kubeconfig to workspace
+cp \\"$KUBECONFIG_FILE\\" ./kubeconfig
 export KUBECONFIG=$(pwd)/kubeconfig
 
-# make sure our wrapper exists and is executable
+# ensure wrapper exists & is executable
 chmod +x ./scripts/portforward-smoke.sh || true
 
-# wait for pods to be ready (adjust selector if your chart uses different labels)
+# wait for pods to be ready (adjust selector if needed)
 kubectl -n dev wait --for=condition=ready pod -l app.kubernetes.io/name=sample-app --timeout=120s
 
-# run wrapper: <service> <local-port> <remote-port> -- <smoke-test-cmd...>
-# wrapper will start port-forward, run the smoke-test, and cleanup automatically
-./scripts/portforward-smoke.sh svc/sample-app-sample-app-svc 18080 8080 -- bash ./scripts/smoke-test.sh "http://localhost:18080" "/actuator/health" "/api/hello"
+# run wrapper (it will start port-forward, run smoke test, and cleanup)
+./scripts/portforward-smoke.sh svc/sample-app-sample-app-svc 18080 8080 -- bash ./scripts/smoke-test.sh \\"http://localhost:18080\\" \\"/actuator/health\\" \\"/api/hello\\"
+"
 '''
     }
   }
