@@ -1,18 +1,15 @@
 pipeline {
   agent any // top-level agent so post steps can run in node when available
   environment {
-    // set defaults; override in Jenkins credentials bindings or pipeline params
     APP_NAME = "sample-app"
     REPO = "bitteswar/${APP_NAME}"
-    // Choose registry: dockerhub, ghcr, or ECR
     REGISTRY = "dockerhub" // options: dockerhub | ghcr | ecr
     DOCKERHUB_CRED = "dockerhub-creds"
-    GHCR_TOKEN = credentials('github-token') // secret text - ensure this exists
+    GHCR_TOKEN = credentials('github-token')
     AWS_CREDS = 'aws-creds'
     KUBECONFIG_CREDENTIAL_ID = 'kubeconfig-dev'
     SONAR_TOKEN = credentials('sonar-token')
-    // NOTE: compute GIT_SHORT and IMAGE_TAG after checkout (below)
-    GITHUB_USER = "bitteswar" // set your GitHub username here or via credentials/params
+    GITHUB_USER = "bitteswar"
   }
 
   options {
@@ -27,7 +24,6 @@ pipeline {
     stage('Checkout') {
       steps {
         checkout scm
-        // compute git short after we have a workspace / node
         script {
           def g = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           env.GIT_SHORT = g
@@ -39,7 +35,6 @@ pipeline {
     }
 
     stage('Unit Tests & Build JAR') {
-      //  agent { label 'maven' } // ensure you have a node labelled 'maven'
       steps {
         sh 'mvn -B -DskipTests=false clean package'
         junit '**/target/surefire-reports/*.xml'
@@ -63,7 +58,7 @@ pipeline {
     }
 
     stage('Build Docker Image') {
-      agent any//{ label 'docker' } // node must have docker
+      agent any
       steps {
         unstash 'app-jar'
         sh 'export DOCKER_BUILDKIT=1 || true'
@@ -78,19 +73,18 @@ pipeline {
     }
 
     stage('Image Scan & SBOM') {
-      agent any //{ label 'docker' }
+      agent any
       steps {
         script {
           def imageName = "${REPO}:${IMAGE_TAG}"
           sh '''
             trivy image --severity HIGH,CRITICAL --no-progress --format table ${IMAGE} || true
           '''.replace('${IMAGE}', imageName)
-             // Use official Syft container to generate SBOM (writes to workspace)
           sh """
-            docker run --rm \\
-            -v /var/run/docker.sock:/var/run/docker.sock \\
-            -v $WORKSPACE:$WORKSPACE \\
-            -w $WORKSPACE \\
+            docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $WORKSPACE:$WORKSPACE \
+            -w $WORKSPACE \
              anchore/syft:latest ${imageName} -o json > sbom-${IMAGE_TAG}.json
             """
           archiveArtifacts artifacts: "sbom-${IMAGE_TAG}.json, trivy-*.json", fingerprint: true
@@ -99,7 +93,7 @@ pipeline {
     }
 
     stage('Push Image to Registry') {
-      agent any //{ label 'docker' }
+      agent any
       steps {
         script {
           if (env.REGISTRY == 'dockerhub') {
@@ -131,41 +125,40 @@ pipeline {
     }
 
     stage('Deploy to Dev (Helm)') {
-  agent {
-    docker {
-      image 'dtzar/helm-kubectl:3.9.3' // contains helm and kubectl
-            // force a POSIX shell as entrypoint and mount docker socket
-      args '-v /var/run/docker.sock:/var/run/docker.sock'
+      agent {
+        docker {
+          image 'dtzar/helm-kubectl:3.9.3'
+          args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+      }
+      steps {
+        withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
+          sh '''
+            ls -la
+            ls -la helm || true
+            helm version
+            kubectl version --client
+            export KUBECONFIG=${KUBECONFIG}
+            helm upgrade --install ${APP_NAME} ./helm/sample-app \
+              --namespace dev --create-namespace \
+              --set image.repository=${REPO} \
+              --set image.tag=${IMAGE_TAG} \
+              --wait --timeout 120s
+          '''
+        }
+      }
     }
-  }
-  // { label 'kubectl' } // ensure a node has kubectl+helm and label 'kubectl' is present
-  steps {
-    withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
-      sh '''
-        ls -la
-        ls -la helm || true
-        helm version
-        kubectl version --client
-        export KUBECONFIG=${KUBECONFIG}
-        helm upgrade --install ${APP_NAME} ./helm/sample-app \
-          --namespace dev --create-namespace \
-          --set image.repository=${REPO} \
-          --set image.tag=${IMAGE_TAG} \
-          --wait --timeout 120s
-      '''
-    }
-  }
-}
-stage('Smoke test') {
-  agent {
-    docker {
-      image 'dtzar/helm-kubectl:3.9.3'
-      args '-v /var/run/docker.sock:/var/run/docker.sock'
-    }
-  }
-  steps {
-    withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
-      sh '''
+
+    stage('Smoke test') {
+      agent {
+        docker {
+          image 'dtzar/helm-kubectl:3.9.3'
+          args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+      }
+      steps {
+        withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
+          sh '''
     #!/usr/bin/env bash
     set -euo pipefail
     cp "$KUBECONFIG_FILE" ./kubeconfig
@@ -174,68 +167,69 @@ stage('Smoke test') {
     chmod +x ./scripts/smoke-test.sh || true
     kubectl -n dev wait --for=condition=ready pod -l app.kubernetes.io/name=sample-app --timeout=120s
 
-   # optional tuning:
     export PF_RETRIES=12
     export PF_DELAY=3
     export PF_HEALTH_PATH=/actuator/health
 
-./scripts/portforward-smoke.sh svc/sample-app-sample-app-svc 18080 8080 -- bash ./scripts/smoke-test.sh "http://localhost:18080" "/actuator/health" "/api/hello"
-'''
+    ./scripts/portforward-smoke.sh svc/sample-app-sample-app-svc 18080 8080 -- bash ./scripts/smoke-test.sh "http://localhost:18080" "/actuator/health" "/api/hello"
+          '''
+        }
+      }
+      post {
+        failure {
+          sh '''
+            kubectl -n dev get pods -o wide || true
+            kubectl -n dev describe deploy sample-app || true
+            kubectl -n dev logs -l app.kubernetes.io/name=sample-app --tail=200 || true
+          '''
+        }
+      }
     }
-  }
-  post {
-    failure {
-      sh '''
-        kubectl -n dev get pods -o wide || true
-        kubectl -n dev describe deploy sample-app || true
-        kubectl -n dev logs -l app.kubernetes.io/name=sample-app --tail=200 || true
-      '''
-    }
-  }
- }
 
     stage('Promote to Staging') {
-  when { branch 'main' }
-  input {
-    message "Approve promotion to staging?"
-    submitter "admin"
-  }
-  agent {
-    docker {
-      image 'dtzar/helm-kubectl:3.9.3'
-      args '-v /var/run/docker.sock:/var/run/docker.sock'
-    }
-  }
-  steps {
-    withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
-      sh '''
-#!/usr/bin/env bash
-set -euo pipefail
+      when { branch 'main' }
+      input {
+        message "Approve promotion to staging?"
+        submitter "admin"
+      }
+      agent {
+        docker {
+          image 'dtzar/helm-kubectl:3.9.3'
+          args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+      }
+      steps {
+        withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
+          sh '''
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-cp "$KUBECONFIG" ./kubeconfig
-export KUBECONFIG=$(pwd)/kubeconfig
+    cp "$KUBECONFIG" ./kubeconfig
+    export KUBECONFIG=$(pwd)/kubeconfig
 
-helm version
-kubectl version --client
+    helm version
+    kubectl version --client
 
-helm upgrade --install ${APP_NAME} ./helm/sample-app \
-  --namespace staging --create-namespace \
-  --set image.repository=${REPO} \
-  --set image.tag=${IMAGE_TAG} \
-  --wait --timeout 120s
-'''
+    helm upgrade --install ${APP_NAME} ./helm/sample-app \
+      --namespace staging --create-namespace \
+      --set image.repository=${REPO} \
+      --set image.tag=${IMAGE_TAG} \
+      --wait --timeout 120s
+    '''
+        }
+      }
+      post {
+        failure {
+          sh '''
+            kubectl -n staging get pods -o wide || true
+            kubectl -n staging describe deploy ${APP_NAME} || true
+            kubectl -n staging logs -l app.kubernetes.io/name=${APP_NAME} --tail=200 || true
+          '''
+        }
+      }
     }
-  }
-  post {
-    failure {
-      sh '''
-        kubectl -n staging get pods -o wide || true
-        kubectl -n staging describe deploy ${APP_NAME} || true
-        kubectl -n staging logs -l app.kubernetes.io/name=${APP_NAME} --tail=200 || true
-      '''
-    }
-  }
-}
+
+  } // <-- end of stages
 
   post {
     success {
@@ -255,5 +249,5 @@ helm upgrade --install ${APP_NAME} ./helm/sample-app \
       }
     }
   }
-}
-}
+
+} // <-- end of pipeline
