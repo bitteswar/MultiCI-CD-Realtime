@@ -162,20 +162,24 @@ pipeline {
   steps {
     withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG_FILE')]) {
       sh '''
+        set -euo pipefail
+        # copy kubeconfig to workspace
         cp "$KUBECONFIG_FILE" ./kubeconfig
         export KUBECONFIG=$(pwd)/kubeconfig
 
-        kubectl -n dev port-forward svc/sample-app-sample-app-svc 18080:8080 > pf.log 2>&1 &
-        PF_PID=$!
-        sleep 3
+        # ensure wrapper exists & is executable
+        chmod +x ./scripts/portforward-smoke.sh || true
 
-        ./scripts/smoke-test.sh "http://localhost:18080" "/actuator/health" "/api/hello"
+        # wait for pods to be ready (adjust selector if needed)
+        kubectl -n dev wait --for=condition=ready pod -l app.kubernetes.io/name=sample-app --timeout=120s
 
-        kill $PF_PID || true
+        # run wrapper (it will start port-forward, run the smoke-test, and cleanup)
+        ./scripts/portforward-smoke.sh svc/sample-app-sample-app-svc 18080 8080 -- bash ./scripts/smoke-test.sh "http://localhost:18080" "/actuator/health" "/api/hello"
       '''
     }
   }
 }
+
 
 
     stage('Promote to Staging') {
