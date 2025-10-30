@@ -256,3 +256,4 @@ helm upgrade --install ${APP_NAME} ./helm/sample-app \
     }
   }
 }
+}
