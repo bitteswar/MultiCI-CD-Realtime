@@ -211,7 +211,7 @@ pipeline {
     kubectl version --client
 
     helm upgrade --install ${APP_NAME} ./helm/sample-app \
-      --namespace staging --create-namespace \
+      --namespace staging \
       --set image.repository=${REPO} \
       --set image.tag=${IMAGE_TAG} \
       --wait --timeout 120s

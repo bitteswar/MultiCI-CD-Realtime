@@ -1,0 +1,13 @@
+# file: rbac-helm-clusterbinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: jenkins-deployer-helm-binding-global
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-deployer
+    namespace: dev
+roleRef:
+  kind: ClusterRole
+  name: helm-release-manager-global
+  apiGroup: rbac.authorization.k8s.io
