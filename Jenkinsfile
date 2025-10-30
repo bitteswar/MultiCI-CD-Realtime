@@ -195,25 +195,47 @@ stage('Smoke test') {
  }
 
     stage('Promote to Staging') {
-      when { branch 'main' }
-      input {
-        message "Approve promotion to staging?"
-        submitter "admin"
-      }
-      steps {
-        withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
-          sh '''
-            export KUBECONFIG=${KUBECONFIG}
-            helm upgrade --install ${APP_NAME} ./helm/sample-app \
-                --namespace staging --create-namespace \
-                --set image.repository=${REPO} \
-                --set image.tag=${IMAGE_TAG} \
-                --wait --timeout 120s
-          '''
-        }
-      }
+  when { branch 'main' }
+  input {
+    message "Approve promotion to staging?"
+    submitter "admin"
+  }
+  agent {
+    docker {
+      image 'dtzar/helm-kubectl:3.9.3'
+      args '-v /var/run/docker.sock:/var/run/docker.sock'
     }
-  } // stages
+  }
+  steps {
+    withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
+      sh '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+cp "$KUBECONFIG" ./kubeconfig
+export KUBECONFIG=$(pwd)/kubeconfig
+
+helm version
+kubectl version --client
+
+helm upgrade --install ${APP_NAME} ./helm/sample-app \
+  --namespace staging --create-namespace \
+  --set image.repository=${REPO} \
+  --set image.tag=${IMAGE_TAG} \
+  --wait --timeout 120s
+'''
+    }
+  }
+  post {
+    failure {
+      sh '''
+        kubectl -n staging get pods -o wide || true
+        kubectl -n staging describe deploy ${APP_NAME} || true
+        kubectl -n staging logs -l app.kubernetes.io/name=${APP_NAME} --tail=200 || true
+      '''
+    }
+  }
+}
 
   post {
     success {
